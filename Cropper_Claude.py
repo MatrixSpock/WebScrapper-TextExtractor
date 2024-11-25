@@ -37,7 +37,7 @@ def find_text_boundaries(image, top_marker="Theoretical Questions",
     """
     Find the y-coordinates of the top and bottom markers using OCR.
     Returns tuple of (top_y, bottom_y) coordinates.
-    Raises ValueError with specific details if markers aren't found.
+    Handles split text markers by looking at consecutive text elements.
     """
     # Get OCR data with bounding boxes
     ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
@@ -48,19 +48,38 @@ def find_text_boundaries(image, top_marker="Theoretical Questions",
     # Debug information
     detected_texts = []
     
-    # Process each detected text element
-    for i, text in enumerate(ocr_data['text']):
+    # Create a list of words from markers for matching
+    top_words = top_marker.lower().split()
+    bottom_words = bottom_marker.lower().split()
+    
+    # Process text elements
+    for i in range(len(ocr_data['text'])):
         # Clean up the detected text
-        text = text.strip()
+        text = ocr_data['text'][i].strip()
         if text:  # Only store non-empty text
             detected_texts.append(text)
             
-        # Check for markers
-        if top_marker.lower() in text.lower():
-            top_y = ocr_data['top'][i] + ocr_data['height'][i]
+        # Check for consecutive words matching the markers
+        if i + len(top_words) <= len(ocr_data['text']):
+            # Get sequence of words
+            word_sequence = [ocr_data['text'][j].strip().lower() 
+                           for j in range(i, i + len(top_words))]
             
-        if bottom_marker.lower() in text.lower():
-            bottom_y = ocr_data['top'][i]
+            # Check if sequence matches top marker
+            if word_sequence == top_words:
+                # Use the last word's bottom position
+                last_idx = i + len(top_words) - 1
+                top_y = ocr_data['top'][last_idx] + ocr_data['height'][last_idx]
+                
+        if i + len(bottom_words) <= len(ocr_data['text']):
+            # Get sequence of words
+            word_sequence = [ocr_data['text'][j].strip().lower() 
+                           for j in range(i, i + len(bottom_words))]
+            
+            # Check if sequence matches bottom marker
+            if word_sequence == bottom_words:
+                # Use the first word's top position
+                bottom_y = ocr_data['top'][i]
     
     # Prepare detailed error message if needed
     error_messages = []
